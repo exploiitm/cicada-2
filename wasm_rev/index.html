@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wasm test</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+    /* --- CSS Variables for Theming --- */
+        :root, body.theme-blue {
+            --bg-color: #0a041a;
+            --text-color: #00e5ff;
+            --border-color: #00b8d4;
+            --glow-color: rgba(0, 229, 255, 0.5);
+            --button-bg: #00b8d4;
+            --button-text: #0a041a;
+            --button-hover-bg: #00e5ff;
+            --button-hover-text: #000;
+            --placeholder-color: #007a8c;
+        }
+
+        body.theme-green {
+            --bg-color: #051405;
+            --text-color: #00ff00;
+            --border-color: #00aa00;
+            --glow-color: rgba(0, 255, 0, 0.5);
+            --button-bg: #00aa00;
+            --button-text: #051405;
+            --button-hover-bg: #00ff00;
+            --button-hover-text: #000;
+            --placeholder-color: #006800;
+        }
+
+        body.theme-red {
+            --bg-color: #140505;
+            --text-color: #ff0000;
+            --border-color: #aa0000;
+            --glow-color: rgba(255, 0, 0, 0.5);
+            --button-bg: #aa0000;
+            --button-text: #140505;
+            --button-hover-bg: #ff0000;
+            --button-hover-text: #000;
+            --placeholder-color: #680000;
+        }
+
+        /* --- Basic Setup --- */
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'VT323', monospace; /* Retro monospaced font */
+            font-size: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-shadow: 0 0 5px var(--text-color), 0 0 10px var(--text-color); /* Glowing text effect */
+            transition: background-color 0.5s, color 0.5s, text-shadow 0.5s;
+        }
+
+        /* --- Main Container --- */
+        .terminal-container {
+            width: 90%;
+            max-width: 600px;
+            padding: 2rem;
+            border: 2px solid var(--border-color);
+            box-shadow: 0 0 20px var(--glow-color); /* Outer glow */
+            background-color: rgba(10, 4, 26, 0.5);     /* Slightly transparent inner background */
+            text-align: center;
+            transition: border-color 0.5s, box-shadow 0.5s;
+        }
+        
+        /* --- Text and Headers --- */
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            letter-spacing: 1px;
+        }
+
+        /* --- Input Group (Input + Button) --- */
+        .input-group {
+            display: flex;
+            gap: 10px; /* Space between input and button */
+        }
+
+        /* --- Text Input Field --- */
+        #flagInput {
+            flex-grow: 1; /* Allows input to take up available space */
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: #ffffff; /* Keep input text white for contrast */
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            padding: 10px;
+            outline: none; /* Removes the default browser outline */
+            text-shadow: 0 0 3px var(--text-color);
+            transition: border-color 0.5s, text-shadow 0.5s;
+        }
+        
+        #flagInput::placeholder {
+            color: var(--placeholder-color);
+        }
+
+        /* --- Button --- */
+        button {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 10px 20px;
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            text-shadow: none;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* --- Button Hover Effect --- */
+        button:hover {
+            background-color: var(--button-hover-bg);
+            color: var(--button-hover-text);
+            box-shadow: 0 0 15px var(--button-hover-bg);
+        }
+        
+        /* --- Pop-up Message Styling --- */
+        .popup {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+            z-index: 1000;
+            text-shadow: none;
+            background-color: var(--button-hover-bg);
+            color: var(--button-hover-text);
+            border: 2px solid var(--border-color);
+        }
+        
+        .popup.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+    </style>
+  </head>
+
+  <body>
+    <div class="terminal-container">
+        <h1>System Access</h1>
+        <p>Awaiting Command Input...</p>
+          <div id="popupMessage" class="popup"></div>
+
+        <div class="input-group">
+            <input type="text" id="flagInput" placeholder="Enter Password...">
+            <button onclick="check_flag()">EXECUTE</button>
+        </div>
+    </div>
+
+
+    <script>
+      var memory;
+      function ZigString(pointer) {
+        const len_slice = new Uint32Array(memory.buffer, pointer, 1);
+        const len = len_slice[0];
+
+        const location_str = new Uint32Array(memory.buffer, pointer + 4, 1);
+        const loc = location_str[0];
+
+        const slice = new Uint8Array(memory.buffer, loc, len);
+        return new TextDecoder().decode(slice);
+      }
+      function toZigString(alloc, str) {
+        const ptr = alloc(str.length); // the string
+        const string = alloc(8); // the struct
+
+        const slice = new Uint8Array(memory.buffer, ptr, str.length);
+        slice.set(new TextEncoder().encode(str));
+
+        const struct_slice = new Uint32Array(memory.buffer, string, 2);
+        struct_slice[0] = str.length;
+        struct_slice[1] = ptr;
+        return string;
+      }
+
+      const importObject = {
+        web: {
+                },
+      };
+
+
+
+      var check_flag = () => alert('wait machesh, let me be defined')
+
+      WebAssembly.instantiateStreaming(
+        fetch("./zig-out/bin/wasm_rev.wasm"),
+        importObject
+      ).then((result) => {
+        xports = result.instance.exports;
+        memory = xports.memory;
+         
+          check_flag = () => {
+            const flagInput = document.getElementById('flagInput')
+
+            const result = xports.is_flag(toZigString(xports.alloc, flagInput.value));
+
+            const bodyElement = document.body;
+            const inputElement = document.getElementById('flagInput');
+            const popupElement = document.getElementById('popupMessage');
+            
+            // Remove previous theme classes to reset the state
+            bodyElement.classList.remove('theme-green', 'theme-red');
+
+            if (result) {
+                // --- Correct Flag ---
+                bodyElement.classList.add('theme-green');
+                popupElement.textContent = "ACCESS GRANTED";
+
+            } else {
+                // --- Incorrect Flag ---
+                bodyElement.classList.add('theme-red');
+                popupElement.textContent = "ACCESS DENIED";
+            }
+            
+            // Show the pop-up
+            popupElement.classList.add('show');
+            
+            // Set a timer to hide the pop-up after 3 seconds
+            setTimeout(() => {
+                popupElement.classList.remove('show');
+                bodyElement.classList.add('theme-blue');
+                bodyElement.classList.remove('theme-red');
+                bodyElement.classList.remove('theme-green');
+            }, 3000);
+          }
+      });
+    </script>
+  </body>
+</html>
