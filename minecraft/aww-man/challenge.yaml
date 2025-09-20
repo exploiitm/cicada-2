@@ -1,0 +1,22 @@
+name: minecraft-ctf
+namespace: default
+
+challenge:
+  title: "Aww Man"
+  description: "What's the best way to mine diamonds?"
+  flag: "exploiitm{you_got_games_on_yo_phone}"
+
+service:
+  image: minecraft-ctf:latest
+  ports:
+    - 25565
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+healthcheck:
+  cmd: ["bash", "/healthcheck.sh"]
